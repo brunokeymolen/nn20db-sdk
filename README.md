@@ -1,7 +1,7 @@
 # nn20db SDK demos
 
-![Linux SDK](https://img.shields.io/badge/Linux-SDK%200.0.11-2ea44f)
-![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%200.0.11-e5532d)
+![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.0.0-2ea44f)
+![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%201.0.0-e5532d)
 ![Python API](https://img.shields.io/badge/Python-API-3776ab)
 ![HNSW](https://img.shields.io/badge/Index-HNSW-7c3aed)
 ![Persistent Storage](https://img.shields.io/badge/Storage-LFS%20%2F%20NAND-f59e0b)
