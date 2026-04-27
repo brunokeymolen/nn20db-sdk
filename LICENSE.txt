@@ -1,0 +1,29 @@
+nn20db-sdk License
+
+Copyright (c) 2026 Bruno Keymolen
+Contact: bruno.keymolen@gmail.com
+
+1. Grant of Use
+This software, including the SDK, pre-compiled binaries, headers, and accompanying files (the "Software"), is provided free of charge for private and educational use.
+
+2. Restrictions
+Commercial use of the Software is strictly prohibited without prior written permission from the author.
+
+Commercial use includes, but is not limited to:
+- Use in products or services that are sold or licensed
+- Use within a company or organization for business purposes
+- Integration into commercial or proprietary systems
+- Redistribution as part of a commercial offering
+
+3. Redistribution
+Redistribution of the Software in its original, unmodified form is permitted for non-commercial purposes only, provided that this license file is included.
+
+4. No Warranty
+The Software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement.
+
+5. Limitation of Liability
+In no event shall the author be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the Software or the use or other dealings in the Software.
+
+6. Contact
+For commercial licensing or other inquiries, please contact:
+bruno.keymolen@gmail.com

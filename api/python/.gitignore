@@ -1,0 +1,10 @@
+libnn20db_py.so
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
