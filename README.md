@@ -359,7 +359,7 @@ Supported metric types in the current SDK header:
 
 - The SDK is currently beta.
 - The public repository does not contain the proprietary static libraries.
-- ESP32 demos are search-only by design.
+- ESP32 demos are search-only by design, adding vectors on esp32 is possible but it will be slow, I would suggest to add sporadic.
 - Large indexes should currently be built on Linux and copied to the target device.
 - Multi-threaded search is not implemented yet; use `search_threads = 1`.
 
@@ -372,11 +372,9 @@ I am especially interested in feedback from people working on:
 - embedded AI
 - local-first search
 - ESP32-P4 projects
-- image/audio fingerprinting
 - offline retrieval
 - vector search on constrained devices
 
-If you try the SDK, please open an issue with your hardware, dataset size, vector dimension, recall target, and observed latency.
 
 ---
 
