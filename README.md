@@ -382,10 +382,12 @@ I am especially interested in feedback from people working on:
 
 ### GeoNames demo
 10.000 vectors.
+   
 <img src="img/geo.png" width="60%" alt="GeoNames demo"/>
 
 ### SIFT-128 demo
 1.000.000 vectors.
+   
 <img src="img/sift128.png" width="60%" alt="SIFT-128 demo"/>
 
 
