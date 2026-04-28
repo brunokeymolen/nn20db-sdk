@@ -323,14 +323,20 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
 {
     int k = data->k_gt < 10 ? (int)data->k_gt : 10;
     int ef_search = 64;
+    // Recall 85, EF = 14
+    // Recall 90, EF = 24
+    // Recall 98, EF = 64
+
 
     size_t total_hits = 0;
     size_t qi;
     nn20db_vector_search_result *results;
     int32_t *metadata;
     double t_start;
+    double search_elapsed = 0.0;
     double elapsed;
     double qps;
+    double avg_search_ms;
 
     if (query_limit > data->n_test) {
         query_limit = data->n_test;
@@ -349,8 +355,11 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
     for (qi = 0; qi < query_limit; ++qi) {
         const float *query = data->test + (qi * data->dim);
         const int32_t *gt_row = data->neighbors + (qi * data->k_gt);
+        double search_start = now_seconds();
         int rc = nn20db_vector_search_ef(db, query, k, ef_search, results);
         int ri;
+
+        search_elapsed += now_seconds() - search_start;
 
         if (rc != NN20DB_ERROR_OK) {
             fprintf(stderr, "search failed at query %zu (rc=%d)\n", qi, rc);
@@ -382,8 +391,10 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
     }
     elapsed = now_seconds() - t_start;
     qps = (elapsed > 0.0) ? (double)query_limit / elapsed : 0.0;
+    avg_search_ms = (query_limit > 0) ? (search_elapsed * 1000.0) / (double)query_limit : 0.0;
 
-    printf("queries=%zu ef_search=%d qps=%.2f recall@%d=%.6f\n", query_limit, ef_search, qps, k,
+    printf("queries=%zu ef_search=%d qps=%.2f avg_search_ms=%.3f recall@%d=%.6f\n",
+           query_limit, ef_search, qps, avg_search_ms, k,
            (double)total_hits / (double)((size_t)k * query_limit));
 
     free(results);

@@ -1,4 +1,4 @@
-# nn20db SDK demos
+# nn20db — persistent vector search for small offline devices
 
 ![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.0.0-2ea44f)
 ![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%201.0.0-e5532d)
@@ -14,7 +14,29 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 
 > Status: **beta SDK release**. The API and demo layout may still evolve.
 
+
+## Performance
+
+| Target   |  Dataset | Vectors | Dim | Storage  | RAM budget | Recall | Queries | Avg query time |
+| -------- | -------: | ------: | --: | -------- | ---------: | -----: | ------: | ----------:    |
+| ESP32-P4 | SIFT-128 |      1M | 128 | SD card  |     2.5 MB |    88% |     100 |     5.7 sec    |
+| ESP32-P4 | SIFT-128 |      1M | 128 | SD card  |     2.5 MB |    98% |     100 |    15.2 sec    |
+| Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    85% |   10000 |     0.8 ms     |
+| Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    98% |   10000 |     1.7 ms     |
+<sup>(* RAM budget is the main memory reserved for lsf, caching and search. Runtime RAM usage will be slightly higher)<sup>
+
 ---
+
+## Current limitations
+
+- The SDK is currently beta.
+- The public repository does not contain the source code of the proprietary static libraries. Binary distributions are available via GitHub Releases.
+- ESP32 demos are search-only by design, adding vectors on esp32 is possible but it can get slow. It is suggested to add sporadically.
+- Large indexes should currently be built on Linux and copied to the target device.
+- Multi-threaded search is not implemented yet; use `search_threads = 1`.
+
+---
+
 
 ## Why nn20db?
 
@@ -22,7 +44,7 @@ Most vector databases are designed for servers.
 
 `nn20db` is built for a different problem:
 
-> **How do you search a large vector index when the device has limited RAM, limited CPU, and no cloud connection?**
+> **How do you search a large vector index when the device has limited RAM, limited CPU, and no cloud connection - while preserving high recall and search quality?**
 
 Typical use cases include:
 
@@ -33,6 +55,32 @@ Typical use cases include:
 - Linux-to-embedded workflows where the index is built on Linux and searched on-device
 
 ---
+
+## When should you use nn20db?
+
+Use nn20db when:
+- the vector index is larger than available RAM
+- the device must work offline
+- the target is Linux or embedded hardware such as ESP32-P4
+- search latency of seconds is acceptable in exchange for low-cost hardware and storage
+- the index can be built on Linux and copied to the device
+
+Do not use nn20db if:
+- you need the fastest possible server-side vector search
+- you need a mature cloud/vector database ecosystem
+- you need heavy concurrent writes
+- you need sub-millisecond or high-QPS search
+
+---
+
+## How is this different from normal vector databases?
+
+Most vector databases are designed for servers, desktop systems, mobile apps, or SQLite-like embedded environments.
+
+nn20db is focused on a narrower problem: searching large persistent HNSW indexes on very small offline devices, where the full index does not fit in RAM and storage is slow or cheap.
+
+It is a trade-off: nn20db is not designed to win QPS benchmarks. It is designed to make useful vector search possible in places where typical vector databases are too large, too memory-hungry, or require infrastructure that is not available.
+
 
 ## Key features
 
@@ -353,27 +401,6 @@ Supported metric types in the current SDK header:
 | `logger.level` | Minimum emitted log level. |
 | `logger.path` | Log file path; empty uses the SDK default. |
 
----
-
-## Current limitations
-
-- The SDK is currently beta.
-- The public repository does not contain the proprietary static libraries, these are available in the github releases.
-- ESP32 demos are search-only by design, adding vectors on esp32 is possible but it can get slow. It is suggested to add sporadically.
-- Large indexes should currently be built on Linux and copied to the target device.
-- Multi-threaded search is not implemented yet; use `search_threads = 1`.
-
----
-
-## Looking for testers
-
-I am especially interested in feedback from people working on:
-
-- embedded AI
-- local-first search
-- ESP32-P4 projects
-- offline retrieval
-- vector search on constrained devices
 
 
 ---

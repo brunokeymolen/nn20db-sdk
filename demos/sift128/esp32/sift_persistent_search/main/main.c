@@ -38,7 +38,10 @@
  * Make sure the full path in in 8.3 format.*/
 #define DB_PATH     "/sdcard/nand0/sift128"
 #define DB_K        10
-#define DB_EF       24
+#define DB_EF       14
+// Recall 85, EF = 14
+// Recall 90, EF = 24
+// Recall 98, EF = 64
 
 static const nn20db_config s_config = {
     .vector = {
@@ -76,6 +79,7 @@ static void run_search(void *arg)
     int rc;
     size_t qi;
     size_t total_hits = 0;
+    int64_t total_search_us = 0;
     nn20db_vector_search_result results[DB_K];
     int32_t metadata[DB_K];
 
@@ -98,6 +102,7 @@ static void run_search(void *arg)
         int64_t t0 = esp_timer_get_time();
         rc = nn20db_vector_search_ef(db, q->values, DB_K, DB_EF, results);
         int64_t search_us = esp_timer_get_time() - t0;
+        total_search_us += search_us;
         if (rc != NN20DB_ERROR_OK) {
             printf("[sift-search] %s: search failed rc=%d\n", q->name, rc);
             continue;
@@ -132,12 +137,13 @@ static void run_search(void *arg)
                (double)(search_us/1000000.0));
     }
 
-    printf("[sift-search] recall@%d = %.4f  (%zu/%zu over %zu queries)\n",
+    printf("[sift-search] recall@%d = %.4f  (%zu/%zu over %zu queries)  avg_search=%.3fs\n",
            DB_K,
            (double)total_hits / (double)(SIFT_QUERY_COUNT * DB_K),
            total_hits,
            (size_t)(SIFT_QUERY_COUNT * DB_K),
-           (size_t)SIFT_QUERY_COUNT);
+           (size_t)SIFT_QUERY_COUNT,
+           (double)total_search_us / (double)SIFT_QUERY_COUNT / 1000000.0);
 
     nn20db_dtor(db);
     printf("[sift-search] done\n");
