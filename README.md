@@ -72,11 +72,11 @@ Do not use nn20db if:
 - you need heavy concurrent writes
 - you need sub-millisecond or high-QPS search
 
----
 
-## How is this different from normal vector databases?
 
-Most vector databases are designed for servers, desktop systems, mobile apps, or SQLite-like embedded environments.
+## How is this different from other vector databases?
+
+Most existing vector-search systems assume a very different environment: abundant RAM, fast storage, server-class CPUs, or managed infrastructure.
 
 nn20db is focused on a narrower problem: searching large persistent HNSW indexes on very small offline devices, where the full index does not fit in RAM and storage is slow or cheap.
 
@@ -401,22 +401,6 @@ Supported metric types in the current SDK header:
 | `logger.enabled` | `0` leaves logger settings unchanged; `1` applies this config. |
 | `logger.level` | Minimum emitted log level. |
 | `logger.path` | Log file path; empty uses the SDK default. |
-
-
-
----
-
-## ESP32 demo output
-
-### GeoNames demo
-10.000 vectors.
-   
-<img src="img/geo.png" width="60%" alt="GeoNames demo"/>
-
-### SIFT-128 demo
-1.000.000 vectors.
-   
-<img src="img/sift128.png" width="60%" alt="SIFT-128 demo"/>
 
 
 ---
