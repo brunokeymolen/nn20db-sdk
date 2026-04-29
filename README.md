@@ -35,6 +35,7 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 - ESP32 demos are search-only by design, adding vectors on esp32 is possible but it can get slow. It is suggested to add sporadically.
 - Large indexes should currently be built on Linux and copied to the target device.
 - Multi-threaded search is not implemented yet; use `search_threads = 1`.
+- Delete is not implemented yet.
 
 ---
 
