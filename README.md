@@ -24,7 +24,7 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 | Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    85% |   10000 |     0.8 ms     |
 | Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    98% |   10000 |     1.7 ms     |
 
-<sup>(* RAM budget is the main memory reserved for lsf, caching and search. Runtime RAM usage will be slightly higher)<sup>
+<sup>(*Cold start. *RAM budget is the main memory reserved for lsf, caching and search. Runtime RAM usage will be slightly higher)<sup>
 
 ---
 
