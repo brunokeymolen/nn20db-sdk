@@ -1,0 +1,33 @@
+# =============================================================================
+# nn20db sift_persistent_search — shared sdkconfig defaults
+# Applied to ALL targets. Target-specific overrides live in:
+#   sdkconfig.defaults.esp32p4  (HEX PSRAM at 200 MHz)
+#   sdkconfig.defaults.esp32s3  (Octal PSRAM at 40 MHz)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# FreeRTOS
+# Raise the default pthread/task stack sizes so nn20db search tasks don't
+# overflow. The search task itself is created with 32 KB (see app_main), but
+# the pthread pool used internally by nn20db needs headroom too.
+# -----------------------------------------------------------------------------
+CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=8192
+CONFIG_FREERTOS_IDLE_TASK_STACKSIZE=2048
+
+# -----------------------------------------------------------------------------
+# FAT filesystem
+# nn20db uses the SD card via FAT/VFS. Sector size must match the SD card
+# (modern cards use 4096-byte physical sectors). LFN disabled for 8.3 paths.
+# Two volumes: one for the SD card mount point.
+# -----------------------------------------------------------------------------
+CONFIG_FATFS_SECTOR_4096=y
+CONFIG_FATFS_LFN_NONE=y
+CONFIG_FATFS_VOLUME_COUNT=2
+CONFIG_FATFS_TIMEOUT_MS=10000
+CONFIG_FATFS_PER_FILE_CACHE=y
+
+# -----------------------------------------------------------------------------
+# VFS
+# Enough VFS slots for SD card + internal flash.
+# -----------------------------------------------------------------------------
+CONFIG_VFS_MAX_COUNT=8

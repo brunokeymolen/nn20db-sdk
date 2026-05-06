@@ -20,6 +20,7 @@ counterpart in `demos/sift128/linux/sift_persistent/`.
 
 ---
 
+
 ## Build the database (Linux)
 
 ```bash
@@ -42,13 +43,28 @@ after inserting the card).
 
 ---
 
+## sdkconfig 
+File	                    | Key settings
+----------------------------| ---
+sdkconfig.defaults          | Shared: FreeRTOS stack sizes, FAT (4096 sectors, 2 volumes, no LFN), VFS 8 slots
+sdkconfig.defaults.esp32p4  | HEX PSRAM, 200 MHz, malloc fallback, FATFS_ALLOC_PREFER_EXTRAM
+sdkconfig.defaults.esp32s3  | Octal PSRAM, 40 MHz, malloc fallback, FATFS_ALLOC_PREFER_EXTRAM
+
+### P4
+rm -rf build sdkconfig && idf.py set-target esp32p4 && make build
+
+### S3
+rm -rf build sdkconfig && idf.py set-target esp32s3 && make build
+
+---
+
 ## Build, flash and run
 
 ```bash
 cd demos/sift128/esp32/sift_persistent_search
 
 make build          # compile
-make flash          # flash to device on /dev/ttyACM0
+make flash          # flash to device on /dev/ttyACM0, some s3 have /dev/ttyUSB0
 make monitor        # open serial monitor (Ctrl-] to exit)
 
 make flash-monitor  # flash and open monitor in one step
@@ -58,6 +74,8 @@ To use a different serial port:
 
 ```bash
 make flash-monitor PORT=/dev/ttyUSB0
+
+make PORT=/dev/ttyUSB0 flash monitor
 ```
 
 To clean build artefacts:

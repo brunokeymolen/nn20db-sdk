@@ -38,11 +38,50 @@
  * Make sure the full path in in 8.3 format.*/
 #define DB_PATH     "/sdcard/nand0/sift128"
 #define DB_K        10
-#define DB_EF       14
+#define DB_EF       64
 // Recall 85, EF = 14
 // Recall 90, EF = 24
 // Recall 98, EF = 64
 
+/* -----------------------------------------------------------------------
+ * Target-specific configuration
+ *
+ * esp32p4: 768 KB internal SRAM + optional PSRAM — full cache (512 KB).
+ * esp32s3: 512 KB internal SRAM + 8 MB PSRAM (AP_3v3) — contiguous heap
+ *          is limited, so the storage-cache arena is reduced to 128 KB
+ *          (max_entries=32, 4096 bytes each) to avoid allocation failures.
+ * ----------------------------------------------------------------------- */
+#if CONFIG_IDF_TARGET_ESP32S3
+static const nn20db_config s_config = {
+    .vector = {
+        .type          = NN20DB_DIMENSION_FLOAT32_CONFIG,
+        .dimension     = SIFT_VECTOR_DIM,
+        .metadata_size = (int)sizeof(int32_t),
+    },
+    .storage = {
+        .type = NN20DB_STORAGE_LFS_CONFIG,
+        .lfs = {
+            .device_path             = DB_PATH,
+            .mount_point             = "/sdcard",
+            .lane_cache_size_kb      = 16,  /* same as p4 — values below 16 trigger invalid-arg in lane init */
+            .lane_size_mb            = 128,
+            .log_size_mb             = 1,
+            .log_index_buckets       = 256,
+            .object_cache_size_bytes = 4096,
+            .read_ahead_size_bytes   = 2048,
+            .block_size              = 4096,
+            .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC,
+        },
+        .cache = {
+            .enabled     = 1,
+            .max_entries = 16  /* 16 × 4096 = 64 KB arena — fits S3 contiguous heap */
+        },
+    },
+    .metric = {
+        .type = METRIC_EUCLIDEAN_F32_CONFIG,
+    }
+};
+#else /* esp32p4 (default) */
 static const nn20db_config s_config = {
     .vector = {
         .type          = NN20DB_DIMENSION_FLOAT32_CONFIG,
@@ -57,7 +96,7 @@ static const nn20db_config s_config = {
             .lane_cache_size_kb      = 16,
             .lane_size_mb            = 128,
             .log_size_mb             = 1,
-            .log_index_buckets       = 512,
+            .log_index_buckets       = 256,
             .object_cache_size_bytes = 4096,
             .read_ahead_size_bytes   = 2048,
             .block_size              = 4096,
@@ -65,13 +104,16 @@ static const nn20db_config s_config = {
         },
         .cache = {
             .enabled     = 1,
-            .max_entries = 500
+            .max_entries = 128  /* 128 × 4096 = 512 KB arena */
         },
     },
     .metric = {
-        .type = METRIC_EUCLIDEAN_F32_CONFIG, //the original config has METRIC_EUCLIDEAN_AVX_CONFIG which is not supported on ESP32, ESP optimized config uses METRIC_EUCLIDEAN_F32_CONFIG which is preferred on ESP32 (hardware FPU) vs double (soft-emulated) 
+        .type = METRIC_EUCLIDEAN_F32_CONFIG, /* ESP optimized; AVX not supported on ESP32 */
     }
 };
+#endif /* CONFIG_IDF_TARGET_ESP32S3 */
+
+void nn20db_logger_set_level(int level);
 
 static void run_search(void *arg)
 {
@@ -84,6 +126,8 @@ static void run_search(void *arg)
     int32_t metadata[DB_K];
 
     (void)arg;
+
+    nn20db_logger_set_level(1); /* 4: verbose logging for demo purposes */
 
     printf("[sift-search] opening DB at %s\n", DB_PATH);
     rc = nn20db_open_with_config(&s_config, &db);

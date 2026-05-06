@@ -1,0 +1,36 @@
+# =============================================================================
+# nn20db sift_persistent_search — esp32s3 sdkconfig defaults
+# Merged automatically by idf.py set-target esp32s3 (alongside sdkconfig.defaults).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PSRAM — 8 MB AP_3v3 embedded Octal PSRAM (ESP32-S3-WROOM / WROVER modules)
+#
+# CONFIG_SPIRAM             — enable the PSRAM hardware driver
+# CONFIG_SPIRAM_MODE_OCT    — Octal (OPI) SPI mode required for AP_3v3 die;
+#                             using quad mode causes "PSRAM chip not connected"
+#                             boot abort on these modules
+# CONFIG_SPIRAM_USE_MALLOC  — allow malloc() to fall back to PSRAM when
+#                             internal SRAM is exhausted; essential for large
+#                             contiguous allocations such as the nn20db
+#                             storage-cache arena (128 × 4096 = 512 KB)
+# CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL
+#                           — objects smaller than this threshold always go to
+#                             internal SRAM (faster); larger objects spill to
+#                             PSRAM.  16384 (16 KB) is a good balance.
+# CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL
+#                           — keep this many bytes reserved in internal SRAM
+#                             for ISR / DMA / stack allocations that must not
+#                             reside in PSRAM.  32 KB is safe for this demo.
+# -----------------------------------------------------------------------------
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+
+# -----------------------------------------------------------------------------
+# FATFS — prefer external RAM for FAT work buffers on S3
+# Frees internal SRAM for stack / DMA while PSRAM absorbs FAT I/O buffers.
+# -----------------------------------------------------------------------------
+CONFIG_FATFS_ALLOC_PREFER_EXTRAM=y

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(IDF_TARGET "esp32p4")
+if(NOT DEFINED IDF_TARGET)
+    set(IDF_TARGET "esp32p4")
+endif()
 
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
 set(NN20DB_COMPONENT_DIR "${REPO_ROOT}/sdk/esp32/current/esp32/component/nn20db")

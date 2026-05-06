@@ -1,7 +1,7 @@
-# nn20db — persistent vector search for small offline devices
+# nn20db - persistent vector search for small offline devices
 
-![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.0.0-2ea44f)
-![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%201.0.0-e5532d)
+![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.1.0-2ea44f)
+![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%201.1.0-e5532d)
 ![Python API](https://img.shields.io/badge/Python-API-3776ab)
 ![Index](https://img.shields.io/badge/Index-HNSW-7c3aed)
 ![Storage](https://img.shields.io/badge/Storage-LFS%20%2F%20NAND-f59e0b)
@@ -17,14 +17,18 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 
 ## Performance
 
+k = 10, ef_search=14, 64
+
 | Target   |  Dataset | Vectors | Dim | Storage  | RAM budget | Recall | Queries | Avg query time |
 | -------- | -------: | ------: | --: | -------- | ---------: | -----: | ------: | ----------:    |
-| ESP32-P4 | SIFT-128 |      1M | 128 | SD card  |     2.5 MB |    88% |     100 |     5.7 sec    |
-| ESP32-P4 | SIFT-128 |      1M | 128 | SD card  |     2.5 MB |    98% |     100 |    15.2 sec    |
-| Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    85% |   10000 |     0.8 ms     |
-| Linux    | SIFT-128 |      1M | 128 | SSD      |     4.1 GB |    98% |   10000 |     1.7 ms     |
+| ESP32-P4 | SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    88% |     100 |     5.7 sec    |
+| ESP32-P4 | SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    98% |     100 |    15.2 sec    |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     ~<1 MB |    88% |     100 |     7.7 sec    |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     ~<1 MB |    98% |     100 |    20.4 sec    |
+| Linux    | SIFT-128 |      1M | 128 | SSD      |    ~4.1 GB |    85% |   10000 |     0.8 ms     |
+| Linux    | SIFT-128 |      1M | 128 | SSD      |    ~4.1 GB |    98% |   10000 |     1.7 ms     |
 
-<sup>(*Cold start. *RAM budget is the main memory reserved for lsf, caching and search. Runtime RAM usage will be slightly higher)<sup>
+<sup>(*Indicative figures, based on manual tests with a cold start. RAM budget refers to the main memory reserved for LSF, caching, and search. Runtime RAM usage will be slightly higher.)</sup>
 
 ---
 
@@ -121,9 +125,9 @@ sdk/esp32/current  -> ESP32-P4 SDK
 | `scripts/install-sdk.sh` | Installs a Linux or ESP32 SDK tarball from a local path or release URL. |
 | `api/python/` | Minimal Python API wrapper around the Linux SDK. |
 | `demos/geo/linux/python/` | GeoNames nearest-city demo; builds a persistent 10k-city index on Linux. |
-| `demos/geo/esp32/` | ESP32-P4 search-only version of the GeoNames demo. |
+| `demos/geo/esp32/` | ESP32 search-only version of the GeoNames demo. |
 | `demos/sift128/linux/sift_persistent/` | Linux SIFT-128 persistent HNSW recall demo. |
-| `demos/sift128/esp32/sift_persistent_search/` | ESP32-P4 search-only SIFT-128 recall demo. |
+| `demos/sift128/esp32/sift_persistent_search/` | ESP32 search-only SIFT-128 recall demo. |
 | `sdk/` | Local SDK install location. Generated after installing SDK tarballs. |
 
 Generated SDK payloads, build outputs, downloaded datasets, and generated databases are intentionally left out of git.
@@ -136,7 +140,7 @@ Install from local tarballs:
 
 ```bash
 ./scripts/install-sdk.sh linux /path/to/nn20db-sdk-linux-<version>.tar.gz
-./scripts/install-sdk.sh esp32 /path/to/nn20db-sdk-esp32-<version>.tar.gz
+./scripts/install-sdk.sh esp32 /path/to/nn20db-sdk-esp32<type>-<version>.tar.gz
 ```
 
 Install from GitHub release asset URLs:
@@ -146,7 +150,7 @@ Install from GitHub release asset URLs:
   https://github.com/brunokeymolen/nn20db-sdk/releases/download/<tag>/nn20db-sdk-linux-<version>.tar.gz
 
 ./scripts/install-sdk.sh esp32 \
-  https://github.com/brunokeymolen/nn20db-sdk/releases/download/<tag>/nn20db-sdk-esp32-<version>.tar.gz
+  https://github.com/brunokeymolen/nn20db-sdk/releases/download/<tag>/nn20db-sdk-esp32<type>-<version>.tar.gz
 ```
 
 The installer unpacks the tarball under:

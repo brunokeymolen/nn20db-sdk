@@ -1,0 +1,37 @@
+# =============================================================================
+# nn20db sift_persistent_search — esp32p4 sdkconfig defaults
+# Merged automatically by idf.py set-target esp32p4 (alongside sdkconfig.defaults).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PSRAM — esp32p4 uses HEX (8-line) PSRAM at 200 MHz
+#
+# CONFIG_SPIRAM             — enable the PSRAM hardware driver
+# CONFIG_SPIRAM_MODE_HEX    — 8-line HEX mode required by the P4 PSRAM die;
+#                             different from S3 which uses Octal (OCT) mode
+# CONFIG_SPIRAM_SPEED_200M  — 200 MHz bus speed for P4 HEX PSRAM
+# CONFIG_SPIRAM_USE_MALLOC  — allow malloc() to fall back to PSRAM when
+#                             internal SRAM is exhausted; used by nn20db for
+#                             the storage-cache arena (128 × 4096 = 512 KB)
+# CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL
+#                           — objects smaller than 16 KB stay in fast internal
+#                             SRAM; larger objects spill to PSRAM
+# CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL
+#                           — reserve 32 KB of internal SRAM for ISR/DMA/stack
+# -----------------------------------------------------------------------------
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_HEX=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_BOOT_HW_INIT=y
+CONFIG_SPIRAM_MEMTEST=y
+CONFIG_SPIRAM_PRE_CONFIGURE_MEMORY_PROTECTION=y
+
+# -----------------------------------------------------------------------------
+# FATFS — prefer external RAM for FAT work buffers on P4 (PSRAM available)
+# -----------------------------------------------------------------------------
+CONFIG_FATFS_ALLOC_PREFER_EXTRAM=y
