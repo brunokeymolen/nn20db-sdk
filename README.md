@@ -1,14 +1,14 @@
 # nn20db - persistent vector search for small offline devices
 
 ![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.1.0-2ea44f)
-![ESP32--P4 SDK](https://img.shields.io/badge/ESP32--P4-SDK%201.1.0-e5532d)
+![ESP32--P4 SDK](https://img.shields.io/badge/ESP32-SDK%201.1.0-e5532d)
 ![Python API](https://img.shields.io/badge/Python-API-3776ab)
 ![Index](https://img.shields.io/badge/Index-HNSW-7c3aed)
 ![Storage](https://img.shields.io/badge/Storage-LFS%20%2F%20NAND-f59e0b)
 
 **nn20db** enables million-scale vector search on small devices.
 
-It runs on Linux and embedded hardware such as the **ESP32-P4**, searches directly from low-cost persistent storage, and is designed for datasets that are **far larger than available RAM**. The goal is simple: local vector search without a server, cloud service, GPU, or large memory budget.
+It runs on Linux and embedded hardware such as the **ESP32-S3** and **ESP32-P4**, searches directly from low-cost persistent storage, and is designed for datasets that are **far larger than available RAM**. The goal is simple: local vector search without a server, cloud service, GPU, or large memory budget.
 
 This repository is the public SDK/demo shell for `nn20db`. It contains install tooling, demo applications, Python bindings, and release notes. The proprietary static libraries are not committed to this repository; they are installed into `sdk/<target>/current` from SDK tarballs.
 
@@ -57,7 +57,7 @@ Typical use cases include:
 - edge AI search
 - local-first semantic search
 - embedded retrieval systems
-- ESP32-P4 experiments with large persistent indexes
+- ESP32 experiments with large persistent indexes
 - Linux-to-embedded workflows where the index is built on Linux and searched on-device
 
 ---
@@ -67,7 +67,7 @@ Typical use cases include:
 Use nn20db when:
 - the vector index is larger than available RAM
 - the device must work offline
-- the target is Linux or embedded hardware such as ESP32-P4
+- the target is Linux or embedded hardware such as ESP32
 - search latency of seconds is acceptable in exchange for low-cost hardware and storage
 - the index can be built on Linux and copied to the device
 
@@ -93,7 +93,7 @@ It is a trade-off: nn20db is not designed to win QPS benchmarks. It is designed 
 - **Million-scale vector search**
 - **Persistent HNSW index**
 - **Works beyond available RAM**
-- **Linux and ESP32-P4 SDK builds**
+- **Linux and ESP32-P4 and ESP32-S3 SDK builds**
 - **Static C library + public headers**
 - **Python wrapper for Linux experiments**
 - **Search-only embedded demos using indexes built on Linux**
@@ -107,13 +107,14 @@ It is a trade-off: nn20db is not designed to win QPS benchmarks. It is designed 
 | Target | Tested environment |
 |---|---|
 | Linux | Ubuntu 24.04 |
+| ESP32-S3 | Espressif ESP-IDF v5.x |
 | ESP32-P4 | Espressif ESP-IDF v5.x |
 
 The current local SDK layout uses:
 
 ```text
 sdk/linux/current  -> Linux SDK
-sdk/esp32/current  -> ESP32-P4 SDK
+sdk/esp32/current  -> ESP32-[P4|S3] SDK
 ```
 
 ---
@@ -214,7 +215,7 @@ The generated database is stored under:
 demos/geo/linux/python/data/geo10k
 ```
 
-To run the same data on ESP32-P4, copy that directory to the SD card as:
+To run the same data on ESP32, copy that directory to the SD card as:
 
 ```text
 /nand0/geo10k
@@ -248,7 +249,7 @@ Optional: limit the number of test queries:
 ./sift_persistent_demo /path/to/sift-128-euclidean.hdf5 ./db/sift128 250
 ```
 
-To run the same index on ESP32-P4, copy the generated database directory to the SD card as:
+To run the same index on ESP32, copy the generated database directory to the SD card as:
 
 ```text
 /nand0/sift128
