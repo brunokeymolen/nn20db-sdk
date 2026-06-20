@@ -15,6 +15,13 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 > Status: **beta SDK release**. The API and demo layout may still evolve.
 
 
+<table>
+  <tr>
+    <td><a href="https://www.youtube.com/watch?v=DM6ovzfl5wA"><img src="https://img.youtube.com/vi/DM6ovzfl5wA/0.jpg" width="400"/></a></td>
+    <td><a href="https://www.youtube.com/watch?v=uMlM1yzEbDw"><img src="https://img.youtube.com/vi/uMlM1yzEbDw/0.jpg" width="400"/></a></td>
+  </tr>
+</table>
+
 ## Performance
 
 k = 10, ef_search=14, 64
