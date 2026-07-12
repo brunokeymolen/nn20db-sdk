@@ -94,17 +94,23 @@ static const nn20db_config s_config = {
             .log_index_buckets       = 512,
             .object_cache_size_bytes = 4096,
             .read_ahead_size_bytes   = 2048,
-            .block_size              = 4096,
-            .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC,
+            .block_size              = 512,
+            .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC
+                                            | NN20DB_STORAGE_FLAGS_READ_ONLY,
         },
         .cache = {
             .enabled     = 1,
             .max_entries = 500,
+            ,max_object_size_bytes = 2048
         },
     },
     .metric = {
         /* Linux demo uses cosine similarity on 3-D unit vectors */
         .type = METRIC_COSINE_CONFIG,
+    },
+        .tuning = {
+        .hnsw_node_cache_capacity = 2048,
+        .hnsw_cache_warm_depth    = 2,
     },
 };
 

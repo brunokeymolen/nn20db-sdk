@@ -1,0 +1,4 @@
+/.codex
+/demos/sift128/esp32/sift_persistent_search/build/
+/sdk/esp32/
+/sdk/linux/

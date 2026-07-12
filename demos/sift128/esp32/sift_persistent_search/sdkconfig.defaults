@@ -25,6 +25,11 @@ CONFIG_FATFS_LFN_NONE=y
 CONFIG_FATFS_VOLUME_COUNT=2
 CONFIG_FATFS_TIMEOUT_MS=10000
 CONFIG_FATFS_PER_FILE_CACHE=y
+# Fast-seek: O(1) seeks in read-only files via a per-file cluster map.
+# Essential for nn20db random reads inside 128 MB lane files (requires the
+# DB opened with NN20DB_STORAGE_FLAGS_READ_ONLY so lanes are O_RDONLY).
+CONFIG_FATFS_USE_FASTSEEK=y
+CONFIG_FATFS_FAST_SEEK_BUFFER_SIZE=64
 
 # -----------------------------------------------------------------------------
 # VFS

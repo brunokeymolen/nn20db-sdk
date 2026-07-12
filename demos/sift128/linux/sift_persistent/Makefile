@@ -3,6 +3,11 @@ CFLAGS ?= -O3 -std=c11 -Wall -Wextra
 TARGET = sift_persistent_demo
 SRCS = main.c
 
+# Product quantization config toggle
+# Override: make USE_PQ=0
+USE_PQ ?= 1
+CFLAGS += -DUSE_PQ=$(USE_PQ)
+
 REPO_ROOT := $(abspath ../../../..)
 SDK_ROOT ?= $(REPO_ROOT)/sdk/linux/current
 PKG_CONFIG_PATH := $(SDK_ROOT)/linux/x86_64-linux-gnu/pkgconfig:$(PKG_CONFIG_PATH)

@@ -24,6 +24,7 @@
 
 #include <hdf5.h>
 #include <errno.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,20 @@
 #include <time.h>
 
 #include "nn20db.h"
+
+/* Product quantization config toggle: make USE_PQ=0 for the fp32 build */
+#ifndef USE_PQ
+#define USE_PQ 1
+#endif
+
+#if USE_PQ
+    #include "config_pq.h"
+#else
+    #include "config_fp32.h"
+#endif
+
+/* vectors used for PQ codebook training (evenly strided over the train set) */
+#define PQ_TRAIN_SAMPLES 100000
 
 typedef struct {
     float *train;
@@ -152,56 +167,6 @@ static void free_ann_data(ann_data_t *data)
     memset(data, 0, sizeof(*data));
 }
 
-static nn20db_config make_config(const ann_data_t *data, const char *db_path)
-{
-    nn20db_config config = {
-        .vector = {
-            .type          = NN20DB_DIMENSION_FLOAT32_CONFIG,
-            .dimension     = (int)data->dim,
-            .metadata_size = (int)sizeof(int32_t),
-        },
-        .storage = {
-            .type = NN20DB_STORAGE_LFS_CONFIG,
-            .lfs = {
-                .lane_cache_size_kb      = 8192,
-                .lane_size_mb            = 128,
-                .log_size_mb             = 500,
-                .log_index_buckets       = 262144,
-                .object_cache_size_bytes = 4096,
-                .read_ahead_size_bytes   = 4096,
-                .block_size              = 4096,
-                .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC,
-            },
-            .cache = {
-                .enabled     = 1,
-                .max_entries = 1048576,
-            },
-        },
-        .metric = {
-            .type = METRIC_EUCLIDEAN_AVX2_CONFIG,
-        },
-        .index = {
-            .type = NN20DB_INDEX_HNSW_CONFIG,
-            .hnsw = {
-                .search_threads          = 1,
-                .max_levels              = 5,
-                .diversity_alpha         = 1.2f,
-                .search_seen_set_capacity = 20000,
-                .ef_search               = 64,
-                .level_config[0]         = { .M = 32, .ef_construction = 250 },
-                .level_config[1]         = { .M = 16, .ef_construction = 120 },
-                .level_config[2]         = { .M = 8,  .ef_construction = 60  },
-                .level_config[3]         = { .M = 4,  .ef_construction = 30  },
-                .level_config[4]         = { .M = 2,  .ef_construction = 15  },
-            },
-        },
-    };
-
-    snprintf(config.storage.lfs.device_path, sizeof(config.storage.lfs.device_path), "%s", db_path);
-
-    return config;
-}
-
 static int ensure_parent_dir(const char *db_path)
 {
     char *copy = strdup(db_path);
@@ -276,6 +241,62 @@ static void print_progress(size_t done, size_t total, double elapsed)
             fraction * 100.0, done, total, rate, (int)eta);
 }
 
+static void print_io_stats(NN20DB *db, const char *phase)
+{
+    nn20db_io_stats io;
+
+    if (nn20db_io_stats_get(db, &io) != NN20DB_ERROR_OK) {
+        return; /* backend does not track statistics */
+    }
+
+    printf("io_stats %s: gets=%u cache_hits=%u (%.1f%%) backend_gets=%u preads=%u bytes_read=%llu\n",
+           phase,
+           (unsigned)io.gets,
+           (unsigned)io.cache_hits,
+           io.gets ? 100.0 * (double)io.cache_hits / (double)io.gets : 0.0,
+           (unsigned)io.backend_gets,
+           (unsigned)io.preads,
+           (unsigned long long)io.bytes_read);
+}
+
+/*
+ * Train the PQ codebooks on an evenly-strided sample of the train set.
+ * Must run before the first nn20db_vector_add() on a freshly created PQ
+ * database.
+ */
+static int train_pq(NN20DB *db, const ann_data_t *data)
+{
+    size_t n = data->n_train < PQ_TRAIN_SAMPLES ? data->n_train : PQ_TRAIN_SAMPLES;
+    size_t stride = data->n_train / n;
+    float *samples;
+    size_t i;
+    double t0;
+    int rc;
+
+    samples = malloc(n * data->dim * sizeof(*samples));
+    if (samples == NULL) {
+        fprintf(stderr, "PQ train: allocation failed\n");
+        return 1;
+    }
+
+    for (i = 0; i < n; ++i) {
+        memcpy(samples + i * data->dim,
+               data->train + (i * stride) * data->dim,
+               data->dim * sizeof(*samples));
+    }
+
+    printf("PQ training: k-means on %zu of %zu vectors ...\n", n, data->n_train);
+    t0 = now_seconds();
+    rc = nn20db_pq_train(db, samples, (unsigned int)n);
+    free(samples);
+    if (rc != NN20DB_ERROR_OK) {
+        fprintf(stderr, "PQ train failed (rc=%d)\n", rc);
+        return 1;
+    }
+    printf("PQ training: done in %.1f s\n", now_seconds() - t0);
+    return 0;
+}
+
 static int ingest_vectors(NN20DB *db, const ann_data_t *data)
 {
     size_t i;
@@ -309,29 +330,37 @@ static int ingest_vectors(NN20DB *db, const ann_data_t *data)
     }
 
     fprintf(stderr, "\n");
-
+    
     if (nn20db_compact(db) != NN20DB_ERROR_OK || nn20db_sync(db) != NN20DB_ERROR_OK) {
         fprintf(stderr, "final maintenance failed\n");
         return 1;
     }
 
+
+
     return 0;
 }
 
 
-static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
+static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit,
+                       int ef_search, int rerank)
 {
     int k = data->k_gt < 10 ? (int)data->k_gt : 10;
-    int ef_search = 64;
-    // Recall 85, EF = 14
-    // Recall 90, EF = 24
-    // Recall 98, EF = 64
+    /* With --rerank N: fetch the top N candidates by (approximate) DB
+     * distance, recompute exact L2 against the in-RAM train vectors via the
+     * metadata row index, and keep the best k. Benchmark-only: the PQ DB
+     * stores codes, not vectors, so a deployed device cannot do this. */
+    int k_search = (rerank > k) ? rerank : k;
+    // fp32: Recall 85, EF = 14
+    //       Recall 90, EF = 24
+    //       Recall 98, EF = 64
 
 
     size_t total_hits = 0;
     size_t qi;
     nn20db_vector_search_result *results;
     int32_t *metadata;
+    double *d2 = NULL;
     double t_start;
     double search_elapsed = 0.0;
     double elapsed;
@@ -342,12 +371,18 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
         query_limit = data->n_test;
     }
 
-    results = malloc((size_t)k * sizeof(*results));
-    metadata = malloc((size_t)k * sizeof(*metadata));
-    if (results == NULL || metadata == NULL) {
+    if (ef_search < k_search) {
+        ef_search = k_search; /* ef must cover the candidate list */
+    }
+
+    results = malloc((size_t)k_search * sizeof(*results));
+    metadata = malloc((size_t)k_search * sizeof(*metadata));
+    d2 = malloc((size_t)k_search * sizeof(*d2));
+    if (results == NULL || metadata == NULL || d2 == NULL) {
         fprintf(stderr, "result allocation failed\n");
         free(results);
         free(metadata);
+        free(d2);
         return 1;
     }
 
@@ -356,7 +391,7 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
         const float *query = data->test + (qi * data->dim);
         const int32_t *gt_row = data->neighbors + (qi * data->k_gt);
         double search_start = now_seconds();
-        int rc = nn20db_vector_search_ef(db, query, k, ef_search, results);
+        int rc = nn20db_vector_search_ef(db, query, k_search, ef_search, results);
         int ri;
 
         search_elapsed += now_seconds() - search_start;
@@ -365,13 +400,52 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
             fprintf(stderr, "search failed at query %zu (rc=%d)\n", qi, rc);
             free(results);
             free(metadata);
+            free(d2);
             return 1;
         }
 
-        for (ri = 0; ri < k; ++ri) {
+        for (ri = 0; ri < k_search; ++ri) {
             rc = nn20db_vector_get(db, results[ri].id, NULL, &metadata[ri]);
             if (rc != NN20DB_ERROR_OK) {
                 metadata[ri] = -1;
+            }
+        }
+
+        if (k_search > k) {
+            /* exact distances for the candidate list */
+            for (ri = 0; ri < k_search; ++ri) {
+                d2[ri] = DBL_MAX;
+                if (metadata[ri] >= 0) {
+                    const float *v = data->train + (size_t)metadata[ri] * data->dim;
+                    double sum = 0.0;
+                    size_t di;
+
+                    for (di = 0; di < data->dim; ++di) {
+                        double diff = (double)v[di] - (double)query[di];
+                        sum += diff * diff;
+                    }
+                    d2[ri] = sum;
+                }
+            }
+            /* partial selection sort: move the k best to the front */
+            for (ri = 0; ri < k; ++ri) {
+                int best = ri;
+                int rj;
+
+                for (rj = ri + 1; rj < k_search; ++rj) {
+                    if (d2[rj] < d2[best]) {
+                        best = rj;
+                    }
+                }
+                if (best != ri) {
+                    double td = d2[ri];
+                    int32_t tm = metadata[ri];
+
+                    d2[ri] = d2[best];
+                    d2[best] = td;
+                    metadata[ri] = metadata[best];
+                    metadata[best] = tm;
+                }
             }
         }
 
@@ -393,12 +467,14 @@ static int run_queries(NN20DB *db, const ann_data_t *data, size_t query_limit)
     qps = (elapsed > 0.0) ? (double)query_limit / elapsed : 0.0;
     avg_search_ms = (query_limit > 0) ? (search_elapsed * 1000.0) / (double)query_limit : 0.0;
 
-    printf("queries=%zu ef_search=%d qps=%.2f avg_search_ms=%.3f recall@%d=%.6f\n",
-           query_limit, ef_search, qps, avg_search_ms, k,
+    printf("queries=%zu ef_search=%d rerank=%d qps=%.2f avg_search_ms=%.3f recall@%d=%.6f\n",
+           query_limit, ef_search, (k_search > k) ? k_search : 0,
+           qps, avg_search_ms, k,
            (double)total_hits / (double)((size_t)k * query_limit));
 
     free(results);
     free(metadata);
+    free(d2);
     return 0;
 }
 
@@ -407,22 +483,39 @@ int main(int argc, char **argv)
     ann_data_t data;
     nn20db_config config;
     NN20DB *db;
-    size_t query_limit = 100;
+    size_t query_limit = 1000;
+    int ef_search = 64;
+    int rerank = 0;
     int created_db;
+    int i;
     double t0;
     double t1;
     double t2;
 
-    if (argc < 3 || argc > 4) {
-        fprintf(stderr, "usage: %s <dataset.hdf5> <db-path> [query-limit]\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "usage: %s <dataset.hdf5> <db-path> [query-limit] [--ef-search N] [--rerank N]\n", argv[0]);
         return 2;
     }
 
-    if (argc == 4) {
-        query_limit = (size_t)strtoull(argv[3], NULL, 10);
-        if (query_limit == 0) {
-            fprintf(stderr, "query-limit must be > 0\n");
-            return 2;
+    for (i = 3; i < argc; ++i) {
+        if (strcmp(argv[i], "--ef-search") == 0 && i + 1 < argc) {
+            ef_search = atoi(argv[++i]);
+            if (ef_search <= 0) {
+                fprintf(stderr, "--ef-search must be > 0\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--rerank") == 0 && i + 1 < argc) {
+            rerank = atoi(argv[++i]);
+            if (rerank <= 0) {
+                fprintf(stderr, "--rerank must be > 0\n");
+                return 2;
+            }
+        } else {
+            query_limit = (size_t)strtoull(argv[i], NULL, 10);
+            if (query_limit == 0) {
+                fprintf(stderr, "query-limit must be > 0\n");
+                return 2;
+            }
         }
     }
 
@@ -435,7 +528,14 @@ int main(int argc, char **argv)
     data = load_ann_bench(argv[1]);
     t1 = now_seconds();
 
-    config = make_config(&data, argv[2]);
+    if (data.dim != SIFT_DIM) {
+        /* the PQ segment layout (32 × 4D) and the ESP32 configs assume 128D */
+        fprintf(stderr, "expected %d-dimensional vectors, got %zu\n", SIFT_DIM, data.dim);
+        free_ann_data(&data);
+        return 1;
+    }
+
+    config = make_config((int)data.dim, argv[2]);
     db = open_or_create_db(&config, &created_db);
     if (db == NULL) {
         free_ann_data(&data);
@@ -443,22 +543,34 @@ int main(int argc, char **argv)
     }
 
     if (created_db) {
+        if (config.metric.type == METRIC_EUCLIDEAN_PQ_CONFIG &&
+            nn20db_pq_is_trained(db) != 1) {
+            if (train_pq(db, &data) != 0) {
+                nn20db_dtor(db);
+                free_ann_data(&data);
+                return 1;
+            }
+        }
         printf("created DB, ingesting %zu vectors\n", data.n_train);
         if (ingest_vectors(db, &data) != 0) {
             nn20db_dtor(db);
             free_ann_data(&data);
             return 1;
         }
+        print_io_stats(db, "ingest");
     } else {
         printf("opened existing DB at %s\n", argv[2]);
+        print_io_stats(db, "open+warm");
     }
+    nn20db_io_stats_reset(db);
 
     t2 = now_seconds();
-    if (run_queries(db, &data, query_limit) != 0) {
+    if (run_queries(db, &data, query_limit, ef_search, rerank) != 0) {
         nn20db_dtor(db);
         free_ann_data(&data);
         return 1;
     }
+    print_io_stats(db, "search");
 
     printf("timing load=%.3fs ingest_or_open=%.3fs total=%.3fs\n",
            t1 - t0,

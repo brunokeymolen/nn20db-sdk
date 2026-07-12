@@ -26,16 +26,18 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 
 k = 10, ef_search=14, 64
 
-| Target   |  Dataset | Vectors | Dim | Storage  | RAM budget | Recall | Queries | Avg query time |
-| -------- | -------: | ------: | --: | -------- | ---------: | -----: | ------: | ----------:    |
-| ESP32-P4 | SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    88% |     100 |     5.7 sec    |
-| ESP32-P4 | SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    98% |     100 |    15.2 sec    |
-| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     ~<1 MB |    88% |     100 |     7.7 sec    |
-| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     ~<1 MB |    98% |     100 |    20.4 sec    |
+| Target   |  Dataset | Vectors | Dim | Storage  | RAM budget | Recall | Queries | v1.1.0 - Avg query time | v1.2.0 - Avg query time |
+| -------- | -------: | ------: | --: | -------- | ---------: | -----: | ------: | ----------:    | ----------:    |
+| ESP32-P4 (v1.0) | SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    88% |     100 |     5.7 sec    |   1.5 sec  |
+| ESP32-P4 (v1.0)| SIFT-128 |      1M | 128 | SD 4bit  |    ~2.5 MB |    98% |     100 |    15.2 sec  |  3.9 sec  |    |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     ~<1 MB |    88% |     100 |     7.7 sec    | 1.7 sec |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 1bit  |     <8 MB |    98% |     100 |    20.4 sec    | 4.3 sec |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 4bit  |     <8 MB  |    98% |     100 |    -    |  2.7 sec |
+| ESP32-S3 | SIFT-128 |      1M | 128 | SD 4bit  |     <8 MB  |    88% |     100 |    -    |  1.0 sec |
 | Linux    | SIFT-128 |      1M | 128 | SSD      |    ~4.1 GB |    85% |   10000 |     0.8 ms     |
 | Linux    | SIFT-128 |      1M | 128 | SSD      |    ~4.1 GB |    98% |   10000 |     1.7 ms     |
 
-<sup>(*Indicative figures, based on manual tests with a cold start. RAM budget refers to the main memory reserved for LSF, caching, and search. Runtime RAM usage will be slightly higher.)</sup>
+*<sup>Indicative figures from manual cold-start tests. RAM budget refers to the main memory reserved for LSF, caching, and search; runtime usage will be slightly higher. Optimizations and results vary by use case. v1.2.0 uses the NN20DB_STORAGE_FLAGS_READ_ONLY flag.</sup>
 
 ---
 
@@ -43,7 +45,7 @@ k = 10, ef_search=14, 64
 
 - The SDK is currently beta.
 - The public repository does not contain the source code of the proprietary static libraries. Binary distributions are available via GitHub Releases.
-- ESP32 demos are search-only by design, adding vectors on esp32 is possible but it can get slow. It is suggested to add sporadically.
+- ESP32 demos for v1.2.0 are tested in search-only (RO) mode by design, adding vectors on esp32 is possible but it can get slow, demos for v1.0.0 are in RW mode but focuses on read performance only. It is suggested to add sporadically.
 - Large indexes should currently be built on Linux and copied to the target device.
 - Multi-threaded search is not implemented yet; use `search_threads = 1`.
 - Delete is not implemented yet.
