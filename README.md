@@ -1,7 +1,7 @@
 # nn20db - persistent vector search for small offline devices
 
-![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.1.0-2ea44f)
-![ESP32--P4 SDK](https://img.shields.io/badge/ESP32-SDK%201.1.0-e5532d)
+![Linux SDK](https://img.shields.io/badge/Linux-SDK%201.2.0-2ea44f)
+![ESP32--P4 SDK](https://img.shields.io/badge/ESP32-SDK%201.2.0-e5532d)
 ![Python API](https://img.shields.io/badge/Python-API-3776ab)
 ![Index](https://img.shields.io/badge/Index-HNSW-7c3aed)
 ![Storage](https://img.shields.io/badge/Storage-LFS%20%2F%20NAND-f59e0b)
@@ -14,6 +14,12 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 
 > Status: **beta SDK release**. The API and demo layout may still evolve.
 
+### What's new in v1.2.0
+
+- **Product Quantization (PQ)** — vectors can be stored as compact PQ codes (e.g. 32 subvectors × 8-bit codebooks) instead of raw fp32, shrinking per-node storage significantly at the cost of some recall. See [PQ_OPTIMIZATION.md](demos/sift128/PQ_OPTIMIZATION.md) for tuning notes and measured trade-offs.
+- **Read-only storage mode** (`NN20DB_STORAGE_FLAGS_READ_ONLY`) — skips write-path bookkeeping and enables faster SD/FAT seeks. This optional mode is the expected deployment pattern on ESP32: build the index on Linux, copy it to the device, and search from SD/flash without further writes.
+
+Together, these bring the query-time improvements shown in the benchmarks below.
 
 <table>
   <tr>
@@ -77,12 +83,12 @@ Use nn20db when:
 - the vector index is larger than available RAM
 - the device must work offline
 - the target is Linux or embedded hardware such as ESP32
-- search latency of seconds is acceptable in exchange for low-cost hardware and storage
+- search latency in the sub-second-to-several-second range is acceptable in exchange for low-cost hardware and storage
 - the index can be built on Linux and copied to the device
 
 Do not use nn20db if:
 - you need the fastest possible server-side vector search
-- you need a mature cloud/vector database ecosystem
+- you need a cloud/vector database ecosystem
 - you need heavy concurrent writes
 - you need sub-millisecond or high-QPS search
 
