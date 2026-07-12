@@ -35,3 +35,13 @@ CONFIG_SPIRAM_PRE_CONFIGURE_MEMORY_PROTECTION=y
 # FATFS — prefer external RAM for FAT work buffers on P4 (PSRAM available)
 # -----------------------------------------------------------------------------
 CONFIG_FATFS_ALLOC_PREFER_EXTRAM=y
+
+# -----------------------------------------------------------------------------
+# Chip revision — IDF's ESP32-P4 default targets MP silicon (rev >= v3.0),
+# but early boards (e.g. Waveshare ESP32-P4) ship rev v1.0 chips. Without
+# this, the bootloader is built requiring rev v3.1-v3.99 and esptool refuses
+# to flash a v1.0 chip. Pin the <v3.0 revision family and set the minimum
+# to v1.0 to match the actual silicon.
+# -----------------------------------------------------------------------------
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y

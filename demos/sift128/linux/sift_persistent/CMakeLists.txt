@@ -3,6 +3,10 @@ project(sift_persistent_demo C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Product quantization config toggle
+# Override: cmake -B build -DUSE_PQ=OFF
+option(USE_PQ "Use product quantization config" ON)
+
 # Point CMake at the SDK cmake config
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../..")
 set(nn20db_DIR "${REPO_ROOT}/sdk/linux/current/cmake"
@@ -20,6 +24,8 @@ target_compile_options(sift_persistent_demo PRIVATE
     -O3 -Wall -Wextra
     ${HDF5_CFLAGS_OTHER}
 )
+
+target_compile_definitions(sift_persistent_demo PRIVATE USE_PQ=$<BOOL:${USE_PQ}>)
 
 target_include_directories(sift_persistent_demo PRIVATE
     ${HDF5_INCLUDE_DIRS}

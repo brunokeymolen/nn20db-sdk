@@ -30,90 +30,46 @@
 #include "nn20db.h"
 #include "nn20db_config.h"
 
+#include "sd_storage.h"
 #include "sift_queries.h"
 
-/* Path where the SIFT-128 database was copied on the SD card.
- * Build it on Linux with demos/sift128/linux/sift_persistent, then copy
- * the database directory to the SD card at this path. 
- * Make sure the full path in in 8.3 format.*/
-#define DB_PATH     "/sdcard/nand0/sift128"
+/* Product quantization config toggle
+ * Override: make build USE_PQ=0  (or: idf.py -DUSE_PQ=0 build) */
+#ifndef USE_PQ
+#define USE_PQ 1
+#endif
+
+#if USE_PQ
+    #include "config_pq.h"
+#else
+    #include "config_fp32.h"
+#endif
+
 #define DB_K        10
 #define DB_EF       64
 // Recall 85, EF = 14
 // Recall 90, EF = 24
 // Recall 98, EF = 64
 
-/* -----------------------------------------------------------------------
- * Target-specific configuration
- *
- * esp32p4: 768 KB internal SRAM + optional PSRAM — full cache (512 KB).
- * esp32s3: 512 KB internal SRAM + 8 MB PSRAM (AP_3v3) — contiguous heap
- *          is limited, so the storage-cache arena is reduced to 128 KB
- *          (max_entries=32, 4096 bytes each) to avoid allocation failures.
- * ----------------------------------------------------------------------- */
-#if CONFIG_IDF_TARGET_ESP32S3
-static const nn20db_config s_config = {
-    .vector = {
-        .type          = NN20DB_DIMENSION_FLOAT32_CONFIG,
-        .dimension     = SIFT_VECTOR_DIM,
-        .metadata_size = (int)sizeof(int32_t),
-    },
-    .storage = {
-        .type = NN20DB_STORAGE_LFS_CONFIG,
-        .lfs = {
-            .device_path             = DB_PATH,
-            .mount_point             = "/sdcard",
-            .lane_cache_size_kb      = 16,  /* same as p4 — values below 16 trigger invalid-arg in lane init */
-            .lane_size_mb            = 128,
-            .log_size_mb             = 1,
-            .log_index_buckets       = 256,
-            .object_cache_size_bytes = 4096,
-            .read_ahead_size_bytes   = 2048,
-            .block_size              = 4096,
-            .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC,
-        },
-        .cache = {
-            .enabled     = 1,
-            .max_entries = 16  /* 16 × 4096 = 64 KB arena — fits S3 contiguous heap */
-        },
-    },
-    .metric = {
-        .type = METRIC_EUCLIDEAN_F32_CONFIG,
-    }
-};
-#else /* esp32p4 (default) */
-static const nn20db_config s_config = {
-    .vector = {
-        .type          = NN20DB_DIMENSION_FLOAT32_CONFIG,
-        .dimension     = SIFT_VECTOR_DIM,
-        .metadata_size = (int)sizeof(int32_t),
-    },
-    .storage = {
-        .type = NN20DB_STORAGE_LFS_CONFIG,
-        .lfs = {
-            .device_path             = DB_PATH,
-            .mount_point             = "/sdcard",
-            .lane_cache_size_kb      = 16,
-            .lane_size_mb            = 128,
-            .log_size_mb             = 1,
-            .log_index_buckets       = 256,
-            .object_cache_size_bytes = 4096,
-            .read_ahead_size_bytes   = 2048,
-            .block_size              = 4096,
-            .flags                   = NN20DB_STORAGE_FLAGS_DISABLE_CRC,
-        },
-        .cache = {
-            .enabled     = 1,
-            .max_entries = 128  /* 128 × 4096 = 512 KB arena */
-        },
-    },
-    .metric = {
-        .type = METRIC_EUCLIDEAN_F32_CONFIG, /* ESP optimized; AVX not supported on ESP32 */
-    }
-};
-#endif /* CONFIG_IDF_TARGET_ESP32S3 */
-
 void nn20db_logger_set_level(int level);
+
+static void print_io_stats(NN20DB *db, const char *phase)
+{
+    nn20db_io_stats io;
+
+    if (nn20db_io_stats_get(db, &io) != NN20DB_ERROR_OK) {
+        return; /* backend does not track statistics */
+    }
+
+    printf("[sift-search] io_stats %s: gets=%u cache_hits=%u (%.1f%%) backend_gets=%u preads=%u bytes_read=%llu\n",
+           phase,
+           (unsigned)io.gets,
+           (unsigned)io.cache_hits,
+           io.gets ? 100.0 * (double)io.cache_hits / (double)io.gets : 0.0,
+           (unsigned)io.backend_gets,
+           (unsigned)io.preads,
+           (unsigned long long)io.bytes_read);
+}
 
 static void run_search(void *arg)
 {
@@ -138,6 +94,8 @@ static void run_search(void *arg)
     }
     printf("[sift-search] DB open OK\n");
     printf("[sift-search] DB ef_search=%d\n", DB_EF);
+    print_io_stats(db, "open+warm");
+    nn20db_io_stats_reset(db);
 
     for (qi = 0; qi < SIFT_QUERY_COUNT; ++qi) {
         const sift_query_t *q = &SIFT_QUERIES[qi];
@@ -188,6 +146,7 @@ static void run_search(void *arg)
            (size_t)(SIFT_QUERY_COUNT * DB_K),
            (size_t)SIFT_QUERY_COUNT,
            (double)total_search_us / (double)SIFT_QUERY_COUNT / 1000000.0);
+    print_io_stats(db, "search");
 
     nn20db_dtor(db);
     printf("[sift-search] done\n");
@@ -196,6 +155,12 @@ static void run_search(void *arg)
 
 void app_main(void)
 {
+#ifndef SD_BOARD_NONE
+    /* Board-specific SD driver (must be before any nn20db call); without it
+     * nn20db mounts with its built-in target default. */
+    sd_storage_register_driver();
+#endif
+
     BaseType_t ok = xTaskCreatePinnedToCore(
         run_search, "sift_search", 32 * 1024, NULL, tskIDLE_PRIORITY + 1, NULL, 1);
 

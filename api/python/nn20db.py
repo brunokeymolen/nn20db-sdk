@@ -76,10 +76,36 @@ def _find_lib() -> str:
 _lib: Optional[ctypes.CDLL] = None
 
 
+def _check_abi(lib: ctypes.CDLL) -> None:
+    """Assert the ctypes _Config mirror matches the layout compiled into
+    the shared library (see abi_check.c). Catches silent struct drift
+    between the SDK headers and this file."""
+    try:
+        fn = lib.nn20db_py_config_sizeof
+    except AttributeError:
+        raise RuntimeError(
+            "libnn20db_py.so is missing the ABI check symbol "
+            "nn20db_py_config_sizeof. Rebuild it: make -C api/python"
+        ) from None
+    fn.restype = ctypes.c_size_t
+    fn.argtypes = []
+    c_size = fn()
+    py_size = ctypes.sizeof(_Config)
+    if c_size != py_size:
+        raise RuntimeError(
+            f"nn20db ABI mismatch: sizeof(nn20db_config) is {c_size} in "
+            f"libnn20db_py.so but {py_size} in the Python ctypes mirror. "
+            "The ctypes structs in nn20db.py are out of sync with the SDK "
+            "headers (sdk/linux/current/include/nn20db_config.h) — update "
+            "them to match, then rebuild: make -C api/python"
+        )
+
+
 def _get_lib() -> ctypes.CDLL:
     global _lib
     if _lib is None:
         _lib = ctypes.CDLL(_find_lib())
+        _check_abi(_lib)
         _bind_functions(_lib)
     return _lib
 
@@ -183,12 +209,30 @@ class _IndexConfig(ctypes.Structure):
     ]
 
 
+class _DimensionPq(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("num_segments",     ctypes.c_uint8),
+        ("bits_per_segment", ctypes.c_uint8),
+        ("subvector_dim",    ctypes.c_uint16),
+    ]
+
+
+class _VectorUnion(ctypes.Union):
+    _pack_ = 1
+    _fields_ = [
+        ("reserved", ctypes.c_int),
+        ("pq",       _DimensionPq),
+    ]
+
+
 class _VectorConfig(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("type",          ctypes.c_int),
         ("dimension",     ctypes.c_int),
         ("metadata_size", ctypes.c_int),
+        ("union",         _VectorUnion),
     ]
 
 
@@ -214,6 +258,15 @@ class _LoggerConfig(ctypes.Structure):
     ]
 
 
+class _TuningConfig(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("hnsw_node_cache_capacity", ctypes.c_uint32),
+        ("hnsw_cache_warm_depth",    ctypes.c_uint8),
+        ("reserved",                 ctypes.c_uint8 * 11),
+    ]
+
+
 class _Config(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
@@ -225,6 +278,7 @@ class _Config(ctypes.Structure):
         ("metric",        _MetricConfig),
         ("index",         _IndexConfig),
         ("logger",        _LoggerConfig),
+        ("tuning",        _TuningConfig),
     ]
 
 
@@ -266,6 +320,7 @@ INDEX_HNSW   = 1
 # nn20db_dimension_type
 DIM_FLOAT32 = 0
 DIM_BIT     = 1
+DIM_PQ      = 2
 
 # nn20db_metric_type
 METRIC_COSINE          = 0
@@ -277,6 +332,7 @@ METRIC_HAMMING         = 5
 METRIC_JACCARD         = 6
 METRIC_COSINE_F32      = 7
 METRIC_EUCLIDEAN_F32   = 8
+METRIC_EUCLIDEAN_PQ    = 9
 
 # error codes
 ERROR_OK                       =  0
@@ -310,6 +366,7 @@ _METRIC_NAMES = {
     "jaccard":        METRIC_JACCARD,
     "cosine_f32":     METRIC_COSINE_F32,
     "euclidean_f32":  METRIC_EUCLIDEAN_F32,
+    "euclidean_pq":   METRIC_EUCLIDEAN_PQ,
 }
 
 
@@ -439,10 +496,19 @@ class CacheConfig:
 
 
 @dataclasses.dataclass
+class PqConfig:
+    """Product Quantization parameters (vector_type='pq')."""
+    num_segments: int = 0      # M: number of subvectors
+    bits_per_segment: int = 8  # K: bits per code (usually 8)
+    subvector_dim: int = 0     # dimension of each subvector (e.g. 8 for 128D/16)
+
+
+@dataclasses.dataclass
 class DatabaseConfig:
     dimension: int = 0
     metadata_size: int = 0
-    vector_type: str = "float32"   # "float32" or "bit"
+    vector_type: str = "float32"   # "float32", "bit" or "pq"
+    pq: Optional[PqConfig] = None  # required when vector_type == "pq"
     metric: str = "euclidean"
     storage: Union[LfsStorageConfig, MemoryStorageConfig] = dataclasses.field(
         default_factory=LfsStorageConfig
@@ -459,9 +525,20 @@ def _to_c_config(cfg: DatabaseConfig) -> _Config:
     c = _Config()
 
     # vector
-    c.vector.type          = DIM_BIT if cfg.vector_type == "bit" else DIM_FLOAT32
+    vector_types = {"float32": DIM_FLOAT32, "bit": DIM_BIT, "pq": DIM_PQ}
+    if cfg.vector_type not in vector_types:
+        raise ValueError(
+            f"Unknown vector_type '{cfg.vector_type}'. Valid: {list(vector_types)}"
+        )
+    c.vector.type          = vector_types[cfg.vector_type]
     c.vector.dimension     = cfg.dimension
     c.vector.metadata_size = cfg.metadata_size
+    if cfg.vector_type == "pq":
+        if cfg.pq is None:
+            raise ValueError("vector_type 'pq' requires DatabaseConfig.pq to be set")
+        c.vector.union.pq.num_segments     = cfg.pq.num_segments
+        c.vector.union.pq.bits_per_segment = cfg.pq.bits_per_segment
+        c.vector.union.pq.subvector_dim    = cfg.pq.subvector_dim
 
     # metric
     metric_id = _METRIC_NAMES.get(cfg.metric)
