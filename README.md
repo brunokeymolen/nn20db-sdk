@@ -25,6 +25,7 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
     <td><a href="https://www.youtube.com/watch?v=uMlM1yzEbDw"><img src="https://img.youtube.com/vi/uMlM1yzEbDw/0.jpg" width="400"/></a></td>
   </tr>
 </table>
+<sub>⚡ demo videos are with v1.1.0 and RW settings, search time is significally reduced using the v1.2.0 RO option.</sub>
 
 ## Performance
 
