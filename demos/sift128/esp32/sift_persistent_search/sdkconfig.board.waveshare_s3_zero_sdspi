@@ -1,0 +1,25 @@
+# =============================================================================
+# nn20db sift_persistent_search — Waveshare ESP32-S3-Zero board overrides
+#
+# Merged AFTER sdkconfig.defaults / sdkconfig.defaults.esp32s3, so these values
+# win over the shared S3 defaults (which target the S3-Touch's octal PSRAM).
+# Applied when SD_BOARD=waveshare_s3_zero_sdspi (see Makefile).
+#
+# Board: ESP32-S3-Zero = ESP32-S3FH4R2 chip: 4 MB flash + 2 MB QUAD PSRAM.
+#   https://docs.waveshare.com/ESP32-S3-Zero
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PSRAM — 2 MB embedded QUAD (QPI) PSRAM.
+# The shared S3 defaults enable Octal (OPI) mode for the S3-Touch's 8 MB die;
+# driving this quad die in octal mode aborts at boot with
+# "octal_psram: PSRAM chip is not connected, or wrong PSRAM line mode".
+# Selecting QUAD here deselects OCT (Kconfig choice).
+# -----------------------------------------------------------------------------
+CONFIG_SPIRAM_MODE_QUAD=y
+
+# -----------------------------------------------------------------------------
+# Flash — 4 MB (vs the ESP-IDF S3 default of 2 MB).
+# -----------------------------------------------------------------------------
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"

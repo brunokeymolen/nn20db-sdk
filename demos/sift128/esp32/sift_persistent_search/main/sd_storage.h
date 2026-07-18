@@ -30,7 +30,9 @@
  * devkit's native 4-bit slot).
  *
  * Boards:
- *   waveshare_s3_touch — Waveshare ESP32-S3-Touch-LCD-1.47
+ *   waveshare_s3_touch      — Waveshare ESP32-S3-Touch-LCD-1.47 (SDMMC)
+ *   waveshare_s3_zero_sdspi — Waveshare ESP32-S3-Zero + microSD breakout (SDSPI)
+ *   waveshare_p4            — Waveshare ESP32-P4 (native IOMUX slot, on-chip LDO)
  */
 
 #pragma once

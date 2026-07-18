@@ -26,6 +26,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
+#if CONFIG_SPIRAM
+#include "esp_psram.h"
+#endif
 
 #include "nn20db.h"
 #include "nn20db_config.h"
@@ -46,12 +50,27 @@
 #endif
 
 #define DB_K        10
-#define DB_EF       64
+#define DB_EF       14
 // Recall 85, EF = 14
 // Recall 90, EF = 24
 // Recall 98, EF = 64
 
 void nn20db_logger_set_level(int level);
+
+/* Report which heap ran dry on an NN20DB_ERROR_OUT_OF_MEMORY. Internal SRAM
+ * holds sub-16KB allocs (CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL); the node cache /
+ * warm-up working set live in PSRAM. largest_free_block far below free = the
+ * pool is fragmented rather than simply full. */
+static void dump_oom_heap(const char *where)
+{
+    printf("[sift-search] OOM at %s: internal free=%uKB largest=%uKB | "
+           "psram free=%uKB largest=%uKB\n",
+           where,
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+           (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024),
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
+           (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
+}
 
 static void print_io_stats(NN20DB *db, const char *phase)
 {
@@ -85,10 +104,46 @@ static void run_search(void *arg)
 
     nn20db_logger_set_level(1); /* 4: verbose logging for demo purposes */
 
+    /* The shared config's hnsw_node_cache_capacity is budgeted for the P4 /
+     * S3-Touch (>=8 MB PSRAM). The S3-Zero (ESP32-S3FH4R2) has only 2 MB, so
+     * the full node cache (~2 KB/entry) overcommits PSRAM and search fails
+     * mid-run with NN20DB_ERROR_OUT_OF_MEMORY. Clamp it to a fraction of the
+     * actual PSRAM so one binary fits any board (the cache only affects speed,
+     * not results). */
+    nn20db_config cfg = s_config;
+#if CONFIG_SPIRAM
+    size_t psram_bytes = esp_psram_get_size();
+    if (psram_bytes && psram_bytes < (4u << 20)) {
+        /* Reserve ~3/4 of PSRAM for the storage cache, FAT buffers and general
+         * heap; give the node cache the remaining ~1/4 at ~2 KB/entry. */
+        size_t cap = (psram_bytes / 4) / 2048;
+        if (cfg.tuning.hnsw_node_cache_capacity > cap) {
+            printf("[sift-search] PSRAM=%uKB: clamping hnsw_node_cache_capacity %d -> %u\n",
+                   (unsigned)(psram_bytes / 1024),
+                   (int)cfg.tuning.hnsw_node_cache_capacity, (unsigned)cap);
+            cfg.tuning.hnsw_node_cache_capacity = cap;
+        }
+        /* The warm-up BFS (hnsw_cache_warm_depth) builds a transient frontier
+         * at open — up to ~4.2K nodes at depth 2 with the PQ config's M=32.
+         * That peak, not the resident cache, is what OOMs PQ=1 at open on the
+         * 2 MB Zero. Shallower warm-up shrinks the peak (only warms less cache,
+         * costs a few early cache misses). */
+        if (cfg.tuning.hnsw_cache_warm_depth > 1) {
+            printf("[sift-search] PSRAM=%uKB: clamping hnsw_cache_warm_depth %d -> 1\n",
+                   (unsigned)(psram_bytes / 1024),
+                   (int)cfg.tuning.hnsw_cache_warm_depth);
+            cfg.tuning.hnsw_cache_warm_depth = 1;
+        }
+    }
+#endif
+
     printf("[sift-search] opening DB at %s\n", DB_PATH);
-    rc = nn20db_open_with_config(&s_config, &db);
+    rc = nn20db_open_with_config(&cfg, &db);
     if (rc != NN20DB_ERROR_OK || db == NULL) {
         printf("[sift-search] open failed rc=%d\n", rc);
+        if (rc == NN20DB_ERROR_OUT_OF_MEMORY) {
+            dump_oom_heap("open");
+        }
         vTaskDelete(NULL);
         return;
     }
@@ -107,6 +162,9 @@ static void run_search(void *arg)
         total_search_us += search_us;
         if (rc != NN20DB_ERROR_OK) {
             printf("[sift-search] %s: search failed rc=%d\n", q->name, rc);
+            if (rc == NN20DB_ERROR_OUT_OF_MEMORY) {
+                dump_oom_heap(q->name);
+            }
             continue;
         }
 
