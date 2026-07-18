@@ -19,14 +19,13 @@ This repository is the public SDK/demo shell for `nn20db`. It contains install t
 - **Product Quantization (PQ)** — vectors can be stored as compact PQ codes (e.g. 32 subvectors × 8-bit codebooks) instead of raw fp32, shrinking per-node storage significantly at the cost of some recall. See [PQ_OPTIMIZATION.md](demos/sift128/PQ_OPTIMIZATION.md) for tuning notes and measured trade-offs.
 - **Read-only storage mode** (`NN20DB_STORAGE_FLAGS_READ_ONLY`) — skips write-path bookkeeping and enables faster SD/FAT seeks. This optional mode is the expected deployment pattern on ESP32: build the index on Linux, copy it to the device, and search from SD/flash without further writes.
 
-Together, these bring the query-time improvements shown in the benchmarks below.
-
 <table>
   <tr>
     <td><a href="https://www.youtube.com/watch?v=DM6ovzfl5wA"><img src="https://img.youtube.com/vi/DM6ovzfl5wA/0.jpg" width="400"/></a></td>
     <td><a href="https://www.youtube.com/watch?v=uMlM1yzEbDw"><img src="https://img.youtube.com/vi/uMlM1yzEbDw/0.jpg" width="400"/></a></td>
   </tr>
 </table>
+<sub>⚡ demo videos are with v1.1.0 and RW settings, search time is significally reduced using the v1.2.0 RO option.</sub>
 
 ## Performance
 
